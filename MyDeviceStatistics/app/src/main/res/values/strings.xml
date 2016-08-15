@@ -5,7 +5,7 @@
     <string name="title">Please click on Start button to know statistics of your device storage. Statistics include heavy files, average file
         size, frequent file types on your device.</string>
     <string name="share">Share my statistics</string>
-    <string name="file_size_header">View 10 biggest files</string>
+    <string name="file_size_header">View 10 biggest files with size in bytes</string>
     <string name="average_file_size">Average file size is: %1$s bytes</string>
     <string name="file_extension_header">View 5 frequently used file types</string>
     <string name="share_subject">"Sharing my storage stats:"</string>
