@@ -239,6 +239,11 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
     @Override
     public void onProgressUpdate(Integer... progress) {
         // Update progress
+
+        //In case of configuration changes, make progressBar visible again as pre-execute is not called.
+        if (progressBar.getVisibility() != View.VISIBLE) {
+            progressBar.setVisibility(View.VISIBLE);
+        }
         progressBar.setProgress(progress[0]);
         mBuilder.setProgress(100, progress[0], false);
         mNotifyManager.notify(id, mBuilder.build());
