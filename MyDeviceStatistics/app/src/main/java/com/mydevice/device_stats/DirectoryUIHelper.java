@@ -1,7 +1,7 @@
 package com.mydevice.device_stats;
 
-import android.util.Log;
-
+import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -9,15 +9,47 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Helper class for Directory. It provides data in the required format - sorted, list.
  */
 public class DirectoryUIHelper {
 
-    private List<FileModel> fileList = new ArrayList<>();
+
+    private List<FileDetailsElement> sortedSmallFileSizeList = new ArrayList<>();
+    private List<FileDetailsElement> completeFileSizeList = new ArrayList<>();
     private HashMap<String, Integer> unsortedExtensionFrequencyMap = new HashMap<>();
+    private List<FileDetailsElement> sortedExtensionFrequencyList = new ArrayList<>();
     private long averageFileSize;
+
+    /**
+     * getter for sortedSmallFileSizeList.
+     *
+     * @return
+     */
+    public List<FileDetailsElement> getSortedSmallFileSizeList() {
+        return sortedSmallFileSizeList;
+    }
+
+    /**
+     * getter for sortedExtensionFrequencyList.
+     *
+     * @return
+     */
+    public List<FileDetailsElement> getSortedExtensionFrequencyList() {
+        return sortedExtensionFrequencyList;
+    }
+
+    /**
+     * getter for averageFileSize.
+     *
+     * @return
+     */
+    public long getAverageFileSize() {
+        return averageFileSize;
+    }
+
 
     /**
      * setter for unsortedExtensionFrequencyMap.
@@ -29,30 +61,12 @@ public class DirectoryUIHelper {
     }
 
     /**
-     * getter for unsortedExtensionFrequencyMap.
+     * Setter for completeFileSizeList.
      *
-     * @return
+     * @param completeFileSizeList
      */
-    public HashMap<String, Integer> getUnsortedExtensionFrequencyMap() {
-        return unsortedExtensionFrequencyMap;
-    }
-
-    /**
-     * getter for fileList.
-     *
-     * @return
-     */
-    public List<FileModel> getFileList() {
-        return fileList;
-    }
-
-    /**
-     * Setter for fileList.
-     *
-     * @param fileList
-     */
-    public void setFileList(List<FileModel> fileList) {
-        this.fileList = fileList;
+    public void setCompleteFileSizeList(List<FileDetailsElement> completeFileSizeList) {
+        this.completeFileSizeList = completeFileSizeList;
     }
 
     /**
@@ -62,28 +76,22 @@ public class DirectoryUIHelper {
      *
      * @return List<FileDetailsElement>
      */
-    public List<FileDetailsElement> getBiggestFiles(int numberOfFiles) {
-        List<FileDetailsElement> fileSizeElementList = new ArrayList<>();
+    public void evaluateTopBiggestFiles(int numberOfFiles) {
 
-        List<FileModel> topMostFiles = new ArrayList<>();
+        sortedSmallFileSizeList.clear();
 
-        if (fileList == null || fileList.size() == 0) {
-            return fileSizeElementList;
-        }
-        Collections.sort(fileList, new FileModel());
-        if (numberOfFiles > fileList.size()) {
-            topMostFiles = fileList;
-        } else {
-            topMostFiles = fileList.subList(0, numberOfFiles);
+        if (completeFileSizeList.isEmpty() || completeFileSizeList.size() < 0) {
+            return;
         }
 
-        FileDetailsElement fileDetailsElement;
-        for (FileModel fileModel : topMostFiles) {
-            fileDetailsElement = new FileDetailsElement(fileModel.getFileName(), String.valueOf(fileModel.getSize()));
-            fileSizeElementList.add(fileDetailsElement);
-            Log.e("test>> ", "size of top 10" + fileModel.getFileName() + " size " + fileModel.getSize());
+        Collections.sort(completeFileSizeList, new FileDetailsElement());
+
+        int n = Math.min(completeFileSizeList.size(), numberOfFiles);
+
+        for (int i = 0; i < n; i++) {
+
+            sortedSmallFileSizeList.add(completeFileSizeList.get(i));
         }
-        return fileSizeElementList;
     }
 
     /**
@@ -91,33 +99,34 @@ public class DirectoryUIHelper {
      *
      * @return file size in bytes
      */
-    public long getAverageFileSize() {
+    public void evaluateAverageFileSize() {
+
         long totalSize = 0;
-        for (FileModel file : fileList) {
-            totalSize = totalSize + file.getSize();
+        for (FileDetailsElement file : completeFileSizeList) {
+            totalSize = totalSize + file.getValue();
         }
-
-        averageFileSize = totalSize / fileList.size();
-        return averageFileSize;
+        averageFileSize = totalSize / completeFileSizeList.size();
     }
 
-    public void updateExtensionFrequencyMap(String fileExtension) {
-
-        int count = 1;
-        if (unsortedExtensionFrequencyMap.containsKey(fileExtension)) {
-            count = count + unsortedExtensionFrequencyMap.get(fileExtension);
-        }
-        unsortedExtensionFrequencyMap.put(fileExtension, count);
-    }
 
     /**
-     * provides sorted List<Object></Object> for extension frequency map.
+     * provides sorted List<Object> for extension frequency map.
      *
      * @param numberOfFileTypes
      *
      * @return List<FileDetailsElement>
      */
-    public List<FileDetailsElement> getSortedExtensionFrequencyList(int numberOfFileTypes) {
+    public void evaluateSortedExtensionFrequencyList(int numberOfFileTypes) {
+
+        sortedExtensionFrequencyList.clear();
+
+        if (unsortedExtensionFrequencyMap.isEmpty() || unsortedExtensionFrequencyMap.size() < 0) {
+            return;
+        }
+
+        if (numberOfFileTypes > unsortedExtensionFrequencyMap.size()) {
+            numberOfFileTypes = unsortedExtensionFrequencyMap.size();
+        }
 
         List<Map.Entry<String, Integer>> list = new LinkedList<Map.Entry<String, Integer>>(unsortedExtensionFrequencyMap.entrySet());
 
@@ -132,36 +141,29 @@ public class DirectoryUIHelper {
         list = list.subList(0, numberOfFileTypes);
 
         // Maintaining insertion order with the help of ArrayList
-        List<FileDetailsElement> sortedFileExtFreqList = new ArrayList<>();
         FileDetailsElement fileDetailsElement;
-
         for (Map.Entry<String, Integer> entry : list) {
-            fileDetailsElement = new FileDetailsElement(entry.getKey(), String.valueOf(entry.getValue()));
-            sortedFileExtFreqList.add(fileDetailsElement);
+            fileDetailsElement = new FileDetailsElement();
+            fileDetailsElement.setTitle(entry.getKey());
+            fileDetailsElement.setValue(entry.getValue());
+            sortedExtensionFrequencyList.add(fileDetailsElement);
         }
-
-        return sortedFileExtFreqList;
     }
 
     /**
      * Provides all the data to be shared in formatted order.
      *
-     * @param numberOfBiggestFiles
-     * @param numberOfExtension
-     *
      * @return String
      */
-    public String getSharableData(int numberOfBiggestFiles, int numberOfExtension) {
+    public String getSharableData() {
+
         StringBuilder dataToShare = new StringBuilder();
 
         dataToShare.append("\n Name and size of 10 biggest files on my device:\n");
-
-        List<FileDetailsElement> fileSizeElementList = getBiggestFiles(numberOfBiggestFiles);
-
         int count = 1;
-        for (FileDetailsElement fileDetailsElement : fileSizeElementList) {
+        for (FileDetailsElement fileDetailsElement : getSortedSmallFileSizeList()) {
             dataToShare.append("\n" + count + ".  File Name = " + fileDetailsElement.getTitle()
-                    + " : File Size = " + fileDetailsElement.getvalue() + " bytes");
+                    + " : File Size = " + fileDetailsElement.getValue() + " bytes");
             count++;
         }
 
@@ -170,10 +172,9 @@ public class DirectoryUIHelper {
 
         count = 1;
 
-        List<FileDetailsElement> sortedFileExtFreqList = getSortedExtensionFrequencyList(numberOfExtension);
-        for (FileDetailsElement fileDetailsElement : sortedFileExtFreqList) {
+        for (FileDetailsElement fileDetailsElement : getSortedExtensionFrequencyList()) {
             dataToShare.append("\n" + count + ".  File Type = " + fileDetailsElement.getTitle()
-                    + " : Frequency = " + fileDetailsElement.getvalue());
+                    + " : Frequency = " + fileDetailsElement.getValue());
             count++;
         }
         return dataToShare.toString();

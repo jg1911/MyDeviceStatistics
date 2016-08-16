@@ -7,8 +7,9 @@ import android.os.Environment;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 
+import com.mydevice.device_stats.Constants;
 import com.mydevice.device_stats.DirectoryUIHelper;
-import com.mydevice.device_stats.FileModel;
+import com.mydevice.device_stats.FileDetailsElement;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -39,11 +40,11 @@ public class TasksFragment extends Fragment {
     private HashMap<String, Integer> mExtFrequencyMap;
     private int mProgressCount = 0;
     private TasksCallbacks mTaskCallBack;
-    private List<FileModel> mFileModelList;
+    private List<FileDetailsElement> mFileDetailsElementsList;
 
 
     public TasksFragment() {
-        mFileModelList = new ArrayList<>();
+        mFileDetailsElementsList = new ArrayList<>();
         mExtFrequencyMap = new HashMap<>();
     }
 
@@ -133,9 +134,11 @@ public class TasksFragment extends Fragment {
     /**
      * async task used to process file info and update UI. UI is updated only if reference of task listener is not null.
      * Else directory ui helper object is updated and UI is updated on re attach of the activity.
-     *
      */
     private class scanFilesAsyncTask extends AsyncTask<File, Integer, DirectoryUIHelper> {
+
+        int percentDone = 1;
+        int latestPercentDone;
 
         protected void onPreExecute() {
             if (mTaskCallBack != null) {
@@ -144,23 +147,35 @@ public class TasksFragment extends Fragment {
         }
 
         private void updateProgress(int value) {
-            //Not a very correct way to calculate progress without knowing total size. Using approximate.
-            publishProgress(value / 7);
+            //Not a very correct way to calculate progress without knowing total size. Using approximate
+            latestPercentDone = value > 300 ? value / 20 : value / 5;
+
+            if ((latestPercentDone - percentDone) > 10) {
+                percentDone = latestPercentDone;
+                publishProgress(percentDone);
+            }
         }
 
         protected DirectoryUIHelper doInBackground(File... dir) {
 
             DirectoryUIHelper directoryUIHelper = new DirectoryUIHelper();
-            List<FileModel> fileModelList = null;
+            List<FileDetailsElement> fileDetailsElement = null;
             try {
                 Log.d(TAG, "Do in backg");
-                mFileModelList.clear();
+                mFileDetailsElementsList.clear();
                 mExtFrequencyMap.clear();
                 mProgressCount = 0;
-                fileModelList = getListFiles(dir[0]);
+
+                fileDetailsElement = getListFiles(dir[0]);
+
                 publishProgress(95);
-                directoryUIHelper.setFileList(fileModelList);
+                directoryUIHelper.setCompleteFileSizeList(fileDetailsElement);
                 directoryUIHelper.setUnsortedExtensionFrequencyMap(mExtFrequencyMap);
+
+                directoryUIHelper.evaluateTopBiggestFiles(Constants.NUMBER_OF_FILES);
+                directoryUIHelper.evaluateSortedExtensionFrequencyList(Constants.NUMBER_OF_FILES);
+                directoryUIHelper.evaluateAverageFileSize();
+
                 publishProgress(100);
             } catch (Exception e) {
                 // TODO Auto-generated catch block
@@ -187,10 +202,12 @@ public class TasksFragment extends Fragment {
 
     /**
      * Recursive method to read files in directory and add it in the List
+     *
      * @param parentDir
-     * @return List<FileModel>
+     *
+     * @return List<FileDetailsElement>
      */
-    private List<FileModel> getListFiles(File parentDir) {
+    private List<FileDetailsElement> getListFiles(File parentDir) {
 
         Log.d(TAG, "parent dir>> " + parentDir);
 
@@ -201,32 +218,36 @@ public class TasksFragment extends Fragment {
 
         if (files == null) {
             Log.d(TAG, "no file");
-            return mFileModelList;
+            return mFileDetailsElementsList;
         }
         for (File file : files) {
             if (file.isDirectory()) {
                 getListFiles(file);
             } else {
-                FileModel fileModel = new FileModel();
-                fileModel.setFileName(file.getName());
-                fileModel.setSize(file.length());
-                fileModel.setFileExtension(fileModel.extension());
-                mFileModelList.add(fileModel);
-                updateExtensionFrequencyMap(fileModel.getFileExtension());
+                FileDetailsElement fileModel = new FileDetailsElement();
+                fileModel.setTitle(file.getName());
+                fileModel.setValue(file.length());
+
+                mFileDetailsElementsList.add(fileModel);
+                updateExtensionFrequencyMap(file.getName());
+
                 myAsyncTask.updateProgress(this.mProgressCount++);
 
                 Log.d(TAG, file.getName() + " file absolute path: " + file.getAbsolutePath() + " file length: " + file.length());
             }
         }
-        return mFileModelList;
+        return mFileDetailsElementsList;
     }
 
     /**
-     *  Used to update extension frequency unsorted map
-     * @param fileExtension
+     * Used to update extension frequency unsorted map
+     *
+     * @param fileName
      */
-    public void updateExtensionFrequencyMap(String fileExtension) {
+    public void updateExtensionFrequencyMap(String fileName) {
 
+        int indexOfPerion = fileName.lastIndexOf(".");
+        String fileExtension = fileName.substring(indexOfPerion + 1);
         int count = 1;
         if (mExtFrequencyMap.containsKey(fileExtension)) {
             count = count + mExtFrequencyMap.get(fileExtension);

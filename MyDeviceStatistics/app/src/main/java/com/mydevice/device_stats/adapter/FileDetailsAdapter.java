@@ -48,7 +48,7 @@ public class FileDetailsAdapter extends RecyclerView.Adapter<FileDetailsAdapter.
 
         fileDetailsViewHolder.filePropertyTitle.setText(fileDetailsElementList.get(position).getTitle());
         fileDetailsViewHolder.filePropertyTitle.setVisibility(View.VISIBLE);
-        fileDetailsViewHolder.filePropertyValue.setText(String.valueOf(fileDetailsElementList.get(position).getvalue()));
+        fileDetailsViewHolder.filePropertyValue.setText(String.valueOf(fileDetailsElementList.get(position).getValue()));
     }
 
     /**

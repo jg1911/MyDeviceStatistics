@@ -70,6 +70,13 @@
             android:visibility="gone"
             />
 
+        <ProgressBar
+            android:id="@+id/secondary_progress_bar"
+            android:layout_width="@dimen/xxlarge_margin"
+            android:layout_height="@dimen/xxlarge_margin"
+            android:gravity="center"
+            android:indeterminate="true"
+            android:visibility="gone"/>
 
         <TextView
             android:id="@+id/fileSizeHeader"

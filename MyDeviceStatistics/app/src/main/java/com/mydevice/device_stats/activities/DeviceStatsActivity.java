@@ -11,7 +11,6 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -23,18 +22,16 @@ import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationCompat.Builder;
 
 import com.mydevice.device_stats.DirectoryUIHelper;
-import com.mydevice.device_stats.FileDetailsElement;
 import com.mydevice.device_stats.R;
 import com.mydevice.device_stats.fragments.FileDetailsFragment;
 import com.mydevice.device_stats.fragments.TasksFragment;
 
-import java.util.List;
+import java.io.Serializable;
 
 public class DeviceStatsActivity extends FragmentActivity implements TasksFragment.TasksCallbacks, View.OnClickListener {
 
     private final int RESULT_CODE = 1;
-    private final int NUMBER_OF_FILES = 10;
-    private final int NUMBER_OF_FILE_EXTENSION = 5;
+
     private TasksFragment mTaskFragment;
     private static final String TAG_TASK_FRAGMENT = "task_fragment";
     private static final String TAG_FILE_DETAIL_SIZE_FRAGMENT = "file_detail_fragment";
@@ -47,6 +44,7 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
     private RadioButton startScanButton;
     private RadioButton stopScanButton;
     private ProgressBar progressBar;
+    private ProgressBar secondaryProgressBar;
     private Button shareButton;
     private DirectoryUIHelper directoryUIHelper;
     private LinearLayout parentLayout;
@@ -54,6 +52,7 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
 
     private FragmentManager fragmentManager;
     private NotificationManager mNotifyManager;
+
     private Builder mBuilder;
     private int id = 1;
 
@@ -71,6 +70,7 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
         startScanButton = (RadioButton) findViewById(R.id.start_scan_button);
         stopScanButton = (RadioButton) findViewById(R.id.stop_scan_button);
         progressBar = (ProgressBar) findViewById(R.id.progress_bar);
+        secondaryProgressBar = (ProgressBar) findViewById(R.id.secondary_progress_bar);
         shareButton = (Button) findViewById(R.id.share_button);
 
         fragmentManager = getSupportFragmentManager(); ;
@@ -83,6 +83,7 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
             fragmentManager.beginTransaction().add(mTaskFragment, TAG_TASK_FRAGMENT).commit();
         }
 
+        statusBarNotification();
         startScanButton.setOnClickListener(this);
         stopScanButton.setOnClickListener(this);
         shareButton.setOnClickListener(this);
@@ -117,7 +118,7 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == RESULT_CODE && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             //resume tasks needing this permission
-            statusBarNotification();
+            //     statusBarNotification();
             mTaskFragment.launchTask();
         }
     }
@@ -135,13 +136,12 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
                 frameLayout.setVisibility(View.GONE);
 
                 startScanButton.setChecked(true);
-                stopScanButton.setChecked(false);
 
                 // If read external storage permission is not granted on Marshmallow and above devices, request permission
                 if (!isExternalStoragePermissionGranted())
                     ActivityCompat.requestPermissions(DeviceStatsActivity.this, new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
                 else {
-                    statusBarNotification();
+                    //    statusBarNotification();
                     mTaskFragment.launchTask();
                 }
                 break;
@@ -149,15 +149,15 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
             case R.id.stop_scan_button:
 
                 progressBar.setVisibility(View.GONE);
+                secondaryProgressBar.setVisibility(View.GONE);
                 stopScanButton.setChecked(true);
-                startScanButton.setChecked(false);
 
                 mTaskFragment.cancelTask();
                 break;
 
             case R.id.share_button:
 
-                String dataToShare = directoryUIHelper.getSharableData(NUMBER_OF_FILES, NUMBER_OF_FILE_EXTENSION);
+                String dataToShare = directoryUIHelper.getSharableData();
                 Intent intent = new Intent(); intent.setAction(Intent.ACTION_SEND);
                 intent.setType("text/plain");
                 intent.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.share_subject));
@@ -167,15 +167,14 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
 
             case R.id.fileSizeHeader:
 
-                Fragment fileSizeFragment = FileDetailsFragment.newInstance(directoryUIHelper.getBiggestFiles(NUMBER_OF_FILES));
+                Fragment fileSizeFragment = FileDetailsFragment.newInstance(directoryUIHelper.getSortedSmallFileSizeList());
                 frameLayout.setVisibility(View.VISIBLE);
                 fragmentManager.beginTransaction().replace(R.id.fragment_container, fileSizeFragment, TAG_FILE_DETAIL_SIZE_FRAGMENT).commit();
                 break;
 
             case R.id.fileExtensionHeader:
 
-                Fragment fileExtensionFragment = FileDetailsFragment.newInstance(directoryUIHelper.getSortedExtensionFrequencyList
-                        (NUMBER_OF_FILE_EXTENSION));
+                Fragment fileExtensionFragment = FileDetailsFragment.newInstance(directoryUIHelper.getSortedExtensionFrequencyList());
                 frameLayout.setVisibility(View.VISIBLE);
                 fragmentManager.beginTransaction()
                                .replace(R.id.fragment_container, fileExtensionFragment, TAG_FILE_EXTENSION_DETAIL_FRAGMENT)
@@ -188,11 +187,12 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
         }
     }
 
-    private void statusBarNotification(){
+    private void statusBarNotification() {
         mNotifyManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         mBuilder = new NotificationCompat.Builder(DeviceStatsActivity.this);
         mBuilder.setContentTitle("File Scanner")
                 .setContentText("File scanning in progress")
+                .setAutoCancel(true)
                 .setSmallIcon(R.drawable.ic_launcher);
     }
 
@@ -206,6 +206,8 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
 
         progressBar.setVisibility(View.VISIBLE);
         progressBar.setProgress(0);
+        secondaryProgressBar.setVisibility(View.VISIBLE);
+
         // Displays the progress bar for the first time.
         mBuilder.setProgress(100, 0, false);
         mNotifyManager.notify(id, mBuilder.build());
@@ -221,18 +223,16 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
         this.directoryUIHelper = directoryUIHelper;
 
         progressBar.setVisibility(View.GONE);
+        secondaryProgressBar.setVisibility(View.GONE);
         fileSizeHeaderTextView.setVisibility(View.VISIBLE);
         averageFileSizeTextView.setVisibility(View.VISIBLE);
         fileExtHeaderTextView.setVisibility(View.VISIBLE);
         shareButton.setVisibility(View.VISIBLE);
 
-        List<FileDetailsElement> topList = directoryUIHelper.getBiggestFiles(10);
-        Log.d("DeviceStatsActivity", "Top list size of files " + topList.size());
-        averageFileSizeTextView.setText( getString(R.string.average_file_size, String.valueOf(directoryUIHelper.getAverageFileSize())));
+        averageFileSizeTextView.setText(getString(R.string.average_file_size, String.valueOf(directoryUIHelper.getAverageFileSize())));
 
         mBuilder.setProgress(0, 0, false);
         mBuilder.setContentText("File scan completed");
-
         mNotifyManager.notify(id, mBuilder.build());
     }
 
@@ -242,8 +242,5 @@ public class DeviceStatsActivity extends FragmentActivity implements TasksFragme
         progressBar.setProgress(progress[0]);
         mBuilder.setProgress(100, progress[0], false);
         mNotifyManager.notify(id, mBuilder.build());
-
     }
-
-
 }
